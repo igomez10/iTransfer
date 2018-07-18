@@ -1,4 +1,4 @@
-package main
+package driveAPISetup
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/drive/v3"
+	drive "google.golang.org/api/drive/v3"
 )
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -66,14 +66,16 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func main() {
-	b, err := ioutil.ReadFile("client_secret.json")
+// Initializes a drive service to interact with your files
+func SetupCloud(credentialsFileName string) *drive.Service {
+
+	b, err := ioutil.ReadFile(credentialsFileName)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
 
 	// If modifying these scopes, delete your previously saved client_secret.json.
-	config, err := google.ConfigFromJSON(b, drive.DriveMetadataReadonlyScope)
+	config, err := google.ConfigFromJSON(b, drive.DriveScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
@@ -81,19 +83,8 @@ func main() {
 	srv, err := drive.New(getClient(config))
 	if err != nil {
 		log.Fatalf("Unable to retrieve Drive client: %v", err)
-	}
-
-	r, err := srv.Files.List().PageSize(10).
-		Fields("nextPageToken, files(id, name)").Do()
-	if err != nil {
-		log.Fatalf("Unable to retrieve files: %v", err)
-	}
-	fmt.Println("Files:")
-	if len(r.Files) == 0 {
-		fmt.Println("No files found.")
 	} else {
-		for _, i := range r.Files {
-			fmt.Printf("%s (%s)\n", i.Name, i.Id)
-		}
+		log.Println("SUCCESSFULLY CREATED srv")
 	}
+	return srv
 }
