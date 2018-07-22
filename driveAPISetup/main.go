@@ -84,7 +84,7 @@ func SetupCloud(credentialsFileName string) *drive.Service {
 	if err != nil {
 		log.Fatalf("Unable to retrieve Drive client: %v", err)
 	} else {
-		log.Println("SUCCESSFULLY CREATED srv")
+		fmt.Printf("\rSUCCESSFULLY CREATED drive.Service INSTANCE                ")
 	}
 	return srv
 }

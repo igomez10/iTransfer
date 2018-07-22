@@ -1,16 +1,36 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
 
+	authy "iTransfer/authyInteraction"
 	api "iTransfer/driveAPISetup"
 
-	"google.golang.org/api/drive/v3"
+	drive "google.golang.org/api/drive/v3"
 )
+
+var iTransferFolder *drive.File
+
+type handler struct {
+	Srv *drive.Service
+}
+
+type confirmationMessage struct {
+	Message  string `json:"message"`
+	ID       string `json:"id"`
+	FileName string `json:"file_name"`
+}
 
 func main() {
 	srv := api.SetupCloud("client_secret.json")
+	h := handler{}
+	h.Srv = srv
 	respList, err := srv.Files.List().
 		Corpora("user").
 		IncludeTeamDriveItems(false).
@@ -22,26 +42,72 @@ func main() {
 	if err != nil {
 		fmt.Println("UNEXPECTED ERROR", err)
 	} else {
-		log.Println("SUCCESSFULLY RECEIVED RESPLIST")
+		fmt.Printf("\rSUCCESSFULLY RECEIVED RESPLIST                  ")
+
 	}
 
 	if len(respList.Files) == 0 {
-		// HANDLE FOLDER CREATION
-		log.Println("CREATING FOLDER iTransfer")
+		fmt.Printf("\nCREATING FOLDER iTransfer\n")
 		api.CreateFolder("iTransfer", srv)
 	} else {
-		log.Println("SUCESS, FOLDER ALREADY EXISTS")
+		fmt.Printf("\rSUCESS, FOLDER ALREADY EXISTS                ")
 	}
 
-	iTransferFolder := respList.Files[0]
+	iTransferFolder = respList.Files[0]
 
-	newFile := drive.File{}
-	newFile.Name = "ALOHA"
-	newFile.Parents = []string{iTransferFolder.Id}
-	newID, err := srv.Files.Create(&newFile).Do()
-	if err != nil {
-		fmt.Println("ERROR EXECUTING DO TO CREATE FILE:", err)
-	} else {
-		fmt.Println("SUCCESS:", newID.Id)
+	http.HandleFunc("/health", h.GetHealth)
+
+	http.HandleFunc("/entry", h.PostFile)
+	port := os.Getenv("PORT")
+	fmt.Printf("\rREADY - LISTENING ON PORT %s      ", port)
+	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+}
+
+func (h *handler) GetHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		io.WriteString(w, "OK")
+		log.Println(r.Method, r.URL)
+	}
+}
+
+func (h *handler) PostFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+
+		w.Header().Set("Server", "iTransfer")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+
+		body, meta, err := r.FormFile("file")
+		if err != nil {
+			log.Println("Error reading file from request", err)
+		}
+		defer body.Close()
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(body)
+
+		log.Println(r.Method, r.URL)
+
+		requestID := authy.CreateApprovalRequest(os.Getenv("USERID"), 120, fmt.Sprintf("Request to upload %s", meta.Filename))
+		for authy.CheckApprovalRequest(requestID) == -1 {
+		}
+
+		switch authy.CheckApprovalRequest(requestID) {
+		case 2:
+			w.Write([]byte("{\"error_message\":\"Request expired\"}"))
+			return
+		case 0:
+			w.Write([]byte("{\"error_message\":\"Request denied\"}"))
+			return
+		}
+
+		uploadedFileID, err := api.CreateFile(
+			meta.Filename,
+			[]string{iTransferFolder.Id},
+			buf.Bytes(),
+			h.Srv)
+
+		res, _ := json.Marshal(confirmationMessage{"SUCESS", uploadedFileID, meta.Filename})
+
+		w.Write(res)
 	}
 }
