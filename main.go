@@ -86,8 +86,8 @@ func (h *handler) PostFile(w http.ResponseWriter, r *http.Request) {
 		buf.ReadFrom(body)
 
 		log.Println(r.Method, r.URL)
-
-		requestID := authy.CreateApprovalRequest(os.Getenv("USERID"), 120, fmt.Sprintf("Request to upload %s", meta.Filename))
+		userID := os.Getenv("USERID")
+		requestID := authy.CreateApprovalRequest(userID, 120, fmt.Sprintf("Request to upload %s", meta.Filename))
 		for authy.CheckApprovalRequest(requestID) == -1 {
 		}
 
@@ -109,5 +109,17 @@ func (h *handler) PostFile(w http.ResponseWriter, r *http.Request) {
 		res, _ := json.Marshal(confirmationMessage{"SUCESS", uploadedFileID, meta.Filename})
 
 		w.Write(res)
+	}
+}
+
+func init() {
+	if os.Getenv("USERID") == "" {
+		fmt.Println("\nERROR: env variable USERID not found")
+		os.Exit(1)
+	}
+
+	if os.Getenv("PORT") == "" {
+		fmt.Println("\nERROR: env variable PORT not found")
+		os.Exit(1)
 	}
 }

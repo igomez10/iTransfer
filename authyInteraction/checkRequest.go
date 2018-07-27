@@ -52,8 +52,8 @@ func CheckApprovalRequest(requestID string) int {
 	url := fmt.Sprintf("https://api.authy.com/onetouch/json/approval_requests/%s", requestID)
 
 	req, _ := http.NewRequest("GET", url, nil)
-
-	req.Header.Add("X-Authy-API-Key", os.Getenv("Authy_API_KEY"))
+	authyAPI := os.Getenv("Authy_API_KEY")
+	req.Header.Add("X-Authy-API-Key", authyAPI)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -82,4 +82,10 @@ func parseStatusResponse(response []byte) int {
 		numToReturn = -1
 	}
 	return numToReturn
+}
+
+func init() {
+	if os.Getenv("Authy_API_KEY") == "" {
+		fmt.Println("\nERROR: env variable Authy_API_KEY not found")
+	}
 }

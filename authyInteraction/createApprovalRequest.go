@@ -24,8 +24,8 @@ func CreateApprovalRequest(userID string, seconds int, message string) string {
 	payload := strings.NewReader(content)
 
 	req, _ := http.NewRequest("POST", url, payload)
-
-	req.Header.Add("X-Authy-API-Key", os.Getenv("Authy_API_KEY"))
+	authyAPI := os.Getenv("Authy_API_KEY")
+	req.Header.Add("X-Authy-API-Key", authyAPI)
 	req.Header.Add("Content-Type", "application/json")
 
 	res, err := http.DefaultClient.Do(req)
@@ -45,4 +45,11 @@ func parseResponse(response []byte) string {
 
 	return aar.ApprovalRequest.UUID
 
+}
+
+func init() {
+	if os.Getenv("Authy_API_KEY") == "" {
+		fmt.Println("\nERROR: env var Authy_API_KEY not found")
+		os.Exit(1)
+	}
 }
