@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	authy "iTransfer/authyInteraction"
 	api "iTransfer/driveAPISetup"
@@ -71,44 +72,53 @@ func (h *handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) PostFile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	if r.Method == http.MethodPost {
+		contentType := r.Header.Get("Content-Type")
+		if strings.Contains(contentType, "multipart/form-data") {
+			fmt.Println("RECEIVED CONTENT TYPE : ")
+			w.Header().Set("Server", "iTransfer")
+			w.WriteHeader(200)
 
-		w.Header().Set("Server", "iTransfer")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
+			body, meta, err := r.FormFile("file")
+			if err != nil {
+				log.Println("Error reading file from request", err)
+			}
+			defer body.Close()
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(body)
 
-		body, meta, err := r.FormFile("file")
-		if err != nil {
-			log.Println("Error reading file from request", err)
+			log.Println(r.Method, r.URL)
+			userID := os.Getenv("USERID")
+			requestID := authy.CreateApprovalRequest(userID, 120, fmt.Sprintf("Request to upload %s", meta.Filename))
+			for authy.CheckApprovalRequest(requestID) == -1 {
+			}
+
+			switch authy.CheckApprovalRequest(requestID) {
+			case 2:
+				w.Write([]byte("{\"error_message\":\"Request expired\"}"))
+				return
+			case 0:
+				w.Write([]byte("{\"error_message\":\"Request denied\"}"))
+				return
+			}
+
+			uploadedFileID, err := api.CreateFile(
+				meta.Filename,
+				[]string{iTransferFolder.Id},
+				buf.Bytes(),
+				h.Srv)
+
+			res, _ := json.Marshal(confirmationMessage{"SUCESS", uploadedFileID, meta.Filename})
+
+			w.Write(res)
+		} else {
+			w.WriteHeader(400)
+			w.Write([]byte("{\"error_message\":\"file not found in form of request or Content-Type header not set as multipart/form-data\"}"))
 		}
-		defer body.Close()
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(body)
-
-		log.Println(r.Method, r.URL)
-		userID := os.Getenv("USERID")
-		requestID := authy.CreateApprovalRequest(userID, 120, fmt.Sprintf("Request to upload %s", meta.Filename))
-		for authy.CheckApprovalRequest(requestID) == -1 {
-		}
-
-		switch authy.CheckApprovalRequest(requestID) {
-		case 2:
-			w.Write([]byte("{\"error_message\":\"Request expired\"}"))
-			return
-		case 0:
-			w.Write([]byte("{\"error_message\":\"Request denied\"}"))
-			return
-		}
-
-		uploadedFileID, err := api.CreateFile(
-			meta.Filename,
-			[]string{iTransferFolder.Id},
-			buf.Bytes(),
-			h.Srv)
-
-		res, _ := json.Marshal(confirmationMessage{"SUCESS", uploadedFileID, meta.Filename})
-
-		w.Write(res)
+	} else {
+		w.WriteHeader(400)
+		w.Write([]byte("{\"error_message\":\"Wrong HTTP method in current route, only POST\"}"))
 	}
 }
 
