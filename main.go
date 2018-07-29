@@ -113,13 +113,12 @@ func (h *handler) PostFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func init() {
-	if os.Getenv("USERID") == "" {
-		fmt.Println("\nERROR: env variable USERID not found")
-		os.Exit(1)
-	}
+	neededEnvVars := []string{"USERID", "PORT"}
 
-	if os.Getenv("PORT") == "" {
-		fmt.Println("\nERROR: env variable PORT not found")
-		os.Exit(1)
+	for i := 0; i < len(neededEnvVars); i++ {
+		if os.Getenv(neededEnvVars[i]) == "" {
+			fmt.Printf("\nERROR: env variable %s not found \n", neededEnvVars[i])
+			os.Exit(1)
+		}
 	}
 }

@@ -83,9 +83,3 @@ func parseStatusResponse(response []byte) int {
 	}
 	return numToReturn
 }
-
-func init() {
-	if os.Getenv("Authy_API_KEY") == "" {
-		fmt.Println("\nERROR: env variable Authy_API_KEY not found")
-	}
-}

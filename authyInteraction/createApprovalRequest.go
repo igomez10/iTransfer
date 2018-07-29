@@ -46,10 +46,3 @@ func parseResponse(response []byte) string {
 	return aar.ApprovalRequest.UUID
 
 }
-
-func init() {
-	if os.Getenv("Authy_API_KEY") == "" {
-		fmt.Println("\nERROR: env var Authy_API_KEY not found")
-		os.Exit(1)
-	}
-}
